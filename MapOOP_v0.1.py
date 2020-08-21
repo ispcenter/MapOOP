@@ -1,5 +1,5 @@
 '''
-MapOOP v0.2
+MapOOP v0.3 by Klykov Leonid
 Development started 2020/06/18
 Targets:
 a) ± convenient and fast plotting of tkr characteristics	- надо сделать автонастраиваемые оси и выбор файлов не через код
@@ -24,23 +24,30 @@ class Compressor:
 	2) Get data from it
 	3) Minimize equation using data'''
 
-	def __init__(self, dataset, column, Gv, GvX):
+	def __init__(self, dataset, column, uLabel, Gv, GvX):
 		self.dataset = dataset
 		self.column = column
+		self.uLabel = uLabel
 		self.Gv = Gv
 		self.GvX = GvX
-		self.Gvmax = 1.3*self.Gv[0] # это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
+
+		self.uc200 = 1.5			#при d=5 оптимально 1.5
+		self.uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
+		self.uc = np.polyfit([200,600],[self.uc200, self.uc600], 1)
+		self.Gvmaxt = (self.uc[0]*uLabel + self.uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
 		self.data  = np.array([(row[column].value) for row in self.dataset if row[column].value != None])
 		
-		self.pc = np.polyfit(self.Gv, self.data*(self.Gv - self.Gvmax), 5)
+		self.pc = np.polyfit(self.Gv, self.data*(self.Gv - self.Gvmaxt), 3)
 		self.a = self.pc[0]
 		self.b = self.pc[1]
 		self.c = self.pc[2]
 		self.d = self.pc[3]
-		self.e = self.pc[4]
-		self.f = self.pc[5]
-
-		self.y = (self.a*self.GvX**5 + self.b*self.GvX**4 + self.c*self.GvX**3 + self.d*self.GvX**2 + self.e*self.GvX + self.f)/(self.GvX - self.Gvmax)
+		# self.e = self.pc[4]
+		# self.f = self.pc[5]
+		
+		self.y = (self.a*self.GvX**3 + self.b*self.GvX**2 + self.c*self.GvX + self.d)/(self.GvX - self.Gvmaxt) #test with d=3 => underfitting
+		# self.y = (self.a*self.GvX**4 + self.b*self.GvX**3 + self.c*self.GvX**2 + self.d*self.GvX + self.e)/(self.GvX - self.Gvmaxt)
+		# self.y = (self.a*self.GvX**5 + self.b*self.GvX**4 + self.c*self.GvX**3 + self.d*self.GvX**2 + self.e*self.GvX + self.f)/(self.GvX - self.Gvmaxt)
 		
 	def aproximation5(self):
 		print(self.data)
@@ -73,28 +80,28 @@ class Uk2:
 	1) Receive dataset
 	2) Activates all data grafs'''
 
-	def __init__(self, ws, label, marker, firstRow, lastRow):
+	def __init__(self, ws, uLabel, marker, firstRow, lastRow):
 
 		self.ws = ws
-		self.label = label
+		self.uLabel = uLabel
 		self.marker = marker
 		self.firstRow = firstRow
 		self.lastRow = lastRow
 		self.data = self.ws[f'A{self.firstRow}':f'I{self.lastRow}']
 
-		self.Gv  = np.array([(row[1].value) for row in self.data  if row[1].value != None]) #this check is necessary, because not all data rows may filled
+		self.Gv = np.array([(row[1].value) for row in self.data  if row[1].value != None]) #this check is necessary, because not all data rows may filled
 		self.GvX = np.linspace(self.Gv[0], self.Gv[-1], num=count, endpoint=True)
 
-		self.Pt  = np.array([(row[4].value) for row in self.data  if row[4].value != None]) #this check is necessary, because not all data rows may filled
+		self.Pt = np.array([(row[4].value) for row in self.data  if row[4].value != None]) #this check is necessary, because not all data rows may filled
 		self.PtX = np.linspace(min(self.Pt), max(self.Pt), num=count, endpoint=True)
 
-		self.Pk = Compressor(self.data, 2, self.Gv, self.GvX) 	#(dataset, column, Gv, x_coords)
-		self.KPDk = Compressor(self.data, 3, self.Gv, self.GvX)	#(dataset, column, Gv, x_coords)
+		self.Pk 	 = Compressor(self.data, 2, self.uLabel, self.Gv, self.GvX) 	#(dataset, column, Gv, x_coords)
+		self.KPDk = Compressor(self.data, 3, self.uLabel, self.Gv, self.GvX)	#(dataset, column, Gv, x_coords)
 
 		self.KPDt = Turbine(self.data, 6, self.Pt, self.PtX)
-		self.Gr = Turbine(self.data, 5, self.Pt, self.PtX)
-		self.UCo = Turbine(self.data, 7, self.Pt, self.PtX)
-		self.mft = Turbine(self.data, 8, self.Pt, self.PtX)
+		self.Gr 	 = Turbine(self.data, 5, self.Pt, self.PtX)
+		self.UCo  = Turbine(self.data, 7, self.Pt, self.PtX)
+		self.mft  = Turbine(self.data, 8, self.Pt, self.PtX)
 
 class Map:
 	"""Prototype of a mapData
@@ -147,8 +154,9 @@ class Map:
 		self.ypomp = [u.Pk.data[-1] for u in self.uList]
 
 		#5 compute KPDk max line
-		self.x_KPDk_Max = tuple([u.GvX[np.argmax(u.KPDk.y)] for u in self.uList])
-		self.y_KPDk_Max = tuple([u.Pk.y[np.argmax(u.KPDk.y)] for u in self.uList])
+		self.x_KPDk_Max = tuple([u.GvX[np.argmax(u.KPDk.y)] for u in self.uList])		#tuple n x 1
+		self.y_KPDk_Max = tuple([u.Pk.y[np.argmax(u.KPDk.y)] for u in self.uList])		#tuple n x 1
+		self.z_KPDk_Max = tuple([u.KPDk.y[np.argmax(u.KPDk.y)] for u in self.uList])	#tuple n x 1
 
 		#6 compute levels
 		levels = (58, 60, 64, 68, 70, 72, 74, 76, 77, 78, 79, 80)
@@ -173,7 +181,13 @@ color_4 = 'green'	# color of map4
 # ----------------------Create the map-----------------------
 map1 = Map(file_1, color_1)
 map2 = Map(file_2, color_2)
-
+print(
+	map1.u550.KPDk.a,
+	map1.u550.KPDk.b,
+	map1.u550.KPDk.c,
+	map1.u550.KPDk.d,
+	map1.u550.KPDk.Gvmaxt
+	)
 # ----------------------- Plot the map-----------------------
 
 # structure of a figure
@@ -263,13 +277,13 @@ ax1.set_title('Характеристика компрессора')
 ax1.set_ylabel('Пк')
 ax1.plot(
 	# map1.u200.Gv, map1.u200.Pk.data, map1.u200.marker, map1.u200.GvX, map1.u200.Pk.y, '-',
-	map1.u250.Gv, map1.u250.Pk.data, map1.u250.marker, map1.u250.GvX, map1.u250.Pk.y, '-',
-	map1.u300.Gv, map1.u300.Pk.data, map1.u300.marker, map1.u300.GvX, map1.u300.Pk.y, '-',
-	map1.u350.Gv, map1.u350.Pk.data, map1.u350.marker, map1.u350.GvX, map1.u350.Pk.y, '-',
-	map1.u400.Gv, map1.u400.Pk.data, map1.u400.marker, map1.u400.GvX, map1.u400.Pk.y, '-',
-	map1.u450.Gv, map1.u450.Pk.data, map1.u450.marker, map1.u450.GvX, map1.u450.Pk.y, '-',
-	map1.u500.Gv, map1.u500.Pk.data, map1.u500.marker, map1.u500.GvX, map1.u500.Pk.y, '-',
-	map1.u550.Gv, map1.u550.Pk.data, map1.u550.marker, map1.u550.GvX, map1.u550.Pk.y, '-',
+	# map1.u250.Gv, map1.u250.Pk.data, map1.u250.marker, map1.u250.GvX, map1.u250.Pk.y, '-',
+	# map1.u300.Gv, map1.u300.Pk.data, map1.u300.marker, map1.u300.GvX, map1.u300.Pk.y, '-',
+	# map1.u350.Gv, map1.u350.Pk.data, map1.u350.marker, map1.u350.GvX, map1.u350.Pk.y, '-',
+	# map1.u400.Gv, map1.u400.Pk.data, map1.u400.marker, map1.u400.GvX, map1.u400.Pk.y, '-',
+	# map1.u450.Gv, map1.u450.Pk.data, map1.u450.marker, map1.u450.GvX, map1.u450.Pk.y, '-',
+	# map1.u500.Gv, map1.u500.Pk.data, map1.u500.marker, map1.u500.GvX, map1.u500.Pk.y, '-',
+	# map1.u550.Gv, map1.u550.Pk.data, map1.u550.marker, map1.u550.GvX, map1.u550.Pk.y, '-',
 	# map1.u600.Gv, map1.u600.Pk.data, map1.u600.marker, map1.u600.GvX, map1.u600.Pk.y, '-',
 	map1.xpomp, map1.ypomp, '-', map1.x_KPDk_Max, map1.y_KPDk_Max, c=map1.color, markersize = markersize)
 ax1.plot(
