@@ -155,9 +155,9 @@ def setFigure_compressor_turbine():
 
 	#2.1 -------------------------Pk---------------------
 	ax1.set_title('Характеристика компрессора')
-	ax1.xaxis.set_major_locator(MultipleLocator(0.05))
+	ax1.xaxis.set_major_locator(MultipleLocator(0.1))
 	ax1.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-	ax1.xaxis.set_minor_locator(MultipleLocator(0.01))
+	ax1.xaxis.set_minor_locator(MultipleLocator(0.02))
 	ax1.set_xticklabels([])
 
 	ax1.set_ylabel('Пк')
@@ -167,9 +167,9 @@ def setFigure_compressor_turbine():
 
 	#2.2 -------------------------KPDk--------------------
 	ax2.set_xlabel('Gв.пр')
-	ax2.xaxis.set_major_locator(MultipleLocator(0.05))
-	ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-	ax2.xaxis.set_minor_locator(MultipleLocator(0.01))
+	ax2.xaxis.set_major_locator(MultipleLocator(0.1))
+	ax2.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax2.xaxis.set_minor_locator(MultipleLocator(0.02))
 
 	ax2.set_ylabel('КПД')
 	ax2.yaxis.set_major_locator(MultipleLocator(0.1))
@@ -491,9 +491,9 @@ class Map:
 mapsList = []
 
 # =============================== 2) Config ===============================
-file_1 = 'ТКРы/60к6.xls'
-file_2 = 'ТКРы/60к7.xls'
-file_3 = ''
+file_1 = 'ТКР_80.15.13_2020.05.19.xls'
+file_2 = 'ТКР_80.15Б.13_2020.07.23.xls'
+file_3 = 'ТКР_80.15С.13_2020.07.24.xls'
 file_4 = ''
 
 color_1 = 'black'	# color of map1
