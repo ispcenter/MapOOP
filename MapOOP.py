@@ -1,13 +1,14 @@
 '''
-MapOOP v0.4 by Klykov Leonid
+MapOOP v0.5 by Klykov Leonid
 Development started 2020/06/18
 Targets:
 a) ± convenient and fast plotting of tkr characteristics	- надо сделать автонастраиваемые оси и выбор файлов не через код
 b) + possibility of their combination
-c) ± aproximation of experimental data - badly? but works
+c) ± aproximation of experimental data - works bad: only for visualisation lines
 d) - randomazer
 e) - plotting KPDk levels
-f) - livetime d) by changing data
+f) - livetime plotting by changing data
+g) + opening any excel files
 '''
 
 # =============================== 1) Head ============================
@@ -15,8 +16,43 @@ f) - livetime d) by changing data
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter, AutoMinorLocator)
 import matplotlib.pyplot as plt
 import numpy as np
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
+from xlrd import open_workbook
+from csv import reader
 
+# функция, конвертирующая xls и xlsx в openpyxl
+def opener(file):
+
+	if file.endswith('xlsx'):
+		wb = load_workbook(file)
+
+	elif file.endswith('xls'):
+		# читаем исходный файл xls и находим нужный лист
+		xls_wb = open_workbook(file)
+		xls_ws = xls_wb.sheet_by_index(0)
+
+		# создаём openpyxl-приемник для данных из каждой ячейки
+		wb = Workbook()
+		ws = wb.active
+
+		# заполняем его
+		for row in range(xls_ws.nrows):
+			new_row = []
+			for cell in range(xls_ws.ncols):
+				val = xls_ws.cell_value(row,cell)
+				try:
+					val = float(val)
+				except ValueError:
+					pass
+				new_row.append(val)
+			ws.append(new_row)
+
+	else:
+		print('Sorry, you had selected nonconformat type of file (it must be excel format like xlsx, xls or csv)')
+
+	return wb
+
+# setup function of a figure
 def setFigure():
 
 	#1 ================= structure of a figure =================
@@ -158,19 +194,19 @@ class Compressor:
 		self.uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
 		self.uc = np.polyfit([200,600],[self.uc200, self.uc600], 1)
 		self.Gvmaxt = (self.uc[0]*uLabel + self.uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
-		self.data  = np.array([(row[column].value) for row in self.dataset if row[column].value != None])
+		self.data  = np.array([(row[column].value) for row in self.dataset if (type(row[column].value) == float and row[column].value != 0)])
 		
-		self.pc = np.polyfit(self.Gv, self.data*(self.Gv - self.Gvmaxt), 3)
+		self.pc = np.polyfit(self.Gv, self.data*(self.Gv - self.Gvmaxt), 5)
 		self.a = self.pc[0]
 		self.b = self.pc[1]
 		self.c = self.pc[2]
 		self.d = self.pc[3]
-		# self.e = self.pc[4]
-		# self.f = self.pc[5]
+		self.e = self.pc[4]
+		self.f = self.pc[5]
 		
 		self.y = (self.a*self.GvX**3 + self.b*self.GvX**2 + self.c*self.GvX + self.d)/(self.GvX - self.Gvmaxt) #test with d=3 => underfitting
-		# self.y = (self.a*self.GvX**4 + self.b*self.GvX**3 + self.c*self.GvX**2 + self.d*self.GvX + self.e)/(self.GvX - self.Gvmaxt)
-		# self.y = (self.a*self.GvX**5 + self.b*self.GvX**4 + self.c*self.GvX**3 + self.d*self.GvX**2 + self.e*self.GvX + self.f)/(self.GvX - self.Gvmaxt)
+		self.y = (self.a*self.GvX**4 + self.b*self.GvX**3 + self.c*self.GvX**2 + self.d*self.GvX + self.e)/(self.GvX - self.Gvmaxt)
+		self.y = (self.a*self.GvX**5 + self.b*self.GvX**4 + self.c*self.GvX**3 + self.d*self.GvX**2 + self.e*self.GvX + self.f)/(self.GvX - self.Gvmaxt)
 		
 	def aproximation5(self):
 		print(self.data)
@@ -186,7 +222,7 @@ class Turbine:
 		self.column = column
 		self.Pt = Pt
 		self.PtX = PtX
-		self.data  = np.array([(row[column].value) for row in self.dataset if row[column].value != None])
+		self.data  = np.array([(row[column].value) for row in self.dataset if (type(row[column].value) == float and row[column].value != 0)])
 
 		self.pc = np.polyfit(self.Pt, self.data, 2)
 		self.a = self.pc[0]
@@ -204,7 +240,7 @@ class Uk2:
 	2) Activates all data grafs'''
 
 	def __init__(self, ws, uLabel, marker, color, firstRow, lastRow):
-
+		# data sorting
 		self.ws = ws
 		self.uLabel = uLabel
 		self.marker = marker
@@ -213,14 +249,14 @@ class Uk2:
 		self.lastRow = lastRow
 		self.data = self.ws[f'A{self.firstRow}':f'I{self.lastRow}']
 
-		self.Gv = np.array([(row[1].value) for row in self.data  if row[1].value != None]) #this check is necessary, because not all data rows may filled
+		self.Gv = np.array([row[1].value for row in self.data if (type(row[1].value) == float and row[1].value != 0)]) #if not check => promlems with 0 and str values
 		self.GvX = np.linspace(self.Gv[0], self.Gv[-1], num=count, endpoint=True)
 
-		self.Pt = np.array([(row[4].value) for row in self.data  if row[4].value != None]) #this check is necessary, because not all data rows may filled
+		self.Pt = np.array([(row[4].value) for row in self.data if (type(row[4].value) == float and row[4].value != 0)])
 		self.PtX = np.linspace(min(self.Pt), max(self.Pt), num=count, endpoint=True)
 
-		self.Pk 	 = Compressor(self.data, 2, self.uLabel, self.Gv, self.GvX) 	#(dataset, column, Gv, x_coords)
-		self.KPDk = Compressor(self.data, 3, self.uLabel, self.Gv, self.GvX)	#(dataset, column, Gv, x_coords)
+		self.Pk 	 = Compressor(self.data, 2, self.uLabel, self.Gv, self.GvX) #(dataset, column, ulabel, Gv, x_coords)
+		self.KPDk = Compressor(self.data, 3, self.uLabel, self.Gv, self.GvX) #(dataset, column, ulabel, Gv, x_coords)
 
 		self.KPDt = Turbine(self.data, 6, self.Pt, self.PtX)
 		self.Gr 	 = Turbine(self.data, 5, self.Pt, self.PtX)
@@ -245,36 +281,36 @@ class Map:
 
 		#2 data setup
 		self.file = file
-		self.wb = load_workbook(filename=file)
+		self.wb = opener(file)
 		self.ws = self.wb.active
-		self.uList = []															# only not empty uk2 will go here
+		self.uList = []															# obj base - only not empty uk2 will go here
 
 		#3 all uk2 activation
-		if self.ws[40][1].value != None:										# very useful check - do Uk2 creation or not, if it empty
-			self.u200 = Uk2(self.ws, 200, '1', self.color, 40, 57)	# (ws, label, marker, color, firstRow, lastRow)
-			self.uList.append(self.u200)										# if it created, we say it to object base
-		if self.ws[59][1].value != None:
+		if (type(self.ws[40][1].value) == float and self.ws[40][1].value != 0):	# do Uk2 creation or not, if it is empty
+			self.u200 = Uk2(self.ws, 200, '1', self.color, 40, 57)					# (ws, label, marker, color, firstRow, lastRow)
+			self.uList.append(self.u200)														# if uk2 obj was created, we say to object base about it
+		if (type(self.ws[59][1].value) == float and self.ws[59][1].value != 0):
 			self.u250 = Uk2(self.ws, 250, '^', self.color, 59, 76)
 			self.uList.append(self.u250)
-		if self.ws[78][1].value != None:
+		if (type(self.ws[78][1].value) == float and self.ws[78][1].value != 0):
 			self.u300 = Uk2(self.ws, 300, 's', self.color, 78, 95)
 			self.uList.append(self.u300)
-		if self.ws[97][1].value != None:
+		if (type(self.ws[97][1].value) == float and self.ws[97][1].value != 0):
 			self.u350 = Uk2(self.ws, 350, 'D', self.color, 97, 114)
 			self.uList.append(self.u350)
-		if self.ws[116][1].value != None:
+		if (type(self.ws[116][1].value) == float and self.ws[116][1].value != 0):
 			self.u400 = Uk2(self.ws, 400, 'x', self.color, 116, 133)
 			self.uList.append(self.u400)
-		if self.ws[135][1].value != None:
+		if (type(self.ws[135][1].value) == float and self.ws[135][1].value != 0):
 			self.u450 = Uk2(self.ws, 450, 'o', self.color, 135, 152)
 			self.uList.append(self.u450)
-		if self.ws[154][1].value != None:
+		if (type(self.ws[154][1].value) == float and self.ws[154][1].value != 0):
 			self.u500 = Uk2(self.ws, 500, '+', self.color, 154, 171)
 			self.uList.append(self.u500)
-		if self.ws[173][1].value != None:
+		if (type(self.ws[173][1].value) == float and self.ws[173][1].value != 0):
 			self.u550 = Uk2(self.ws, 550, 'v', self.color, 173, 190)
 			self.uList.append(self.u550)
-		if self.ws[192][1].value != None:
+		if (type(self.ws[192][1].value) == float and self.ws[192][1].value != 0):
 			self.u600 = Uk2(self.ws, 600, '2', self.color, 192, 209)
 			self.uList.append(self.u600)
 
@@ -296,10 +332,12 @@ class Map:
 		# for level in levels:
 		# 	if map1.KPDk.any()
 
+mapsList = []
+
 # =============================== 2) Config ===============================
-file_1 = 'ТКР_80.15.13к04_2020.06.04.xlsx'
-file_2 = 'ТКР_80.15.13к05_2020.06.04.xlsx'
-file_3 = 'file3'
+file_1 = 'ТКР_90-3_2020.05.21.xls'
+file_2 = 'ТКР 90-3-01-проверка.xls'
+file_3 = 'ТКР_80.15.13к05_2020.06.04.xlsx'
 file_4 = 'file4'
 
 color_1 = 'black'	# color of map1
@@ -315,15 +353,7 @@ setFigure()
 
 map1 = Map(file_1, color_1)
 map2 = Map(file_2, color_2)
+# map3 = Map(file_3, color_3)
+# map4 = Map(file_4, color_4)
 
 plt.show()
-
-
-# ============================== 4) dop info ================================
-# print(
-# 	map1.u550.KPDk.a,
-# 	map1.u550.KPDk.b,
-# 	map1.u550.KPDk.c,
-# 	map1.u550.KPDk.d,
-# 	map1.u550.KPDk.Gvmaxt
-# 	)
