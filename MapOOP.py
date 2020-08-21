@@ -1,5 +1,5 @@
 '''
-MapOOP v0.5 by Klykov Leonid
+MapOOP v0.55 by Klykov Leonid
 Development started 2020/06/18
 Targets:
 a) ± convenient and fast plotting of tkr characteristics	- надо сделать автонастраиваемые оси и выбор файлов не через код
@@ -9,6 +9,7 @@ d) - randomazer
 e) - plotting KPDk levels
 f) - livetime plotting by changing data
 g) + opening any excel files
+h) ± 2 different figures: turbine or Tk
 '''
 
 # =============================== 1) Head ============================
@@ -19,6 +20,61 @@ import numpy as np
 from openpyxl import load_workbook, Workbook
 from xlrd import open_workbook
 from csv import reader
+
+def aproximation(self, dim):
+	if dim == 3:
+		uc200 = 1.5			#при d=5 оптимально 1.5
+		uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
+		uc = np.polyfit([200,600],[uc200, uc600], 1)
+		GvZapor = (uc[0]*self.uLabel + uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
+
+		pc = np.polyfit(self.Gv, self.data*(self.Gv - GvZapor), dim)
+		a = pc[0]
+		b = pc[1]
+		c = pc[2]
+		d = pc[3]
+		
+		x = self.GvX
+		y = (a*x**3 + b*x**2 + c*x + d)/(x - GvZapor)
+
+		return y
+
+	elif dim == 4:
+		uc200 = 1.5			#при d=5 оптимально 1.5
+		uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
+		uc = np.polyfit([200,600],[uc200, uc600], 1)
+		GvZapor = (uc[0]*self.uLabel + uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
+
+		pc = np.polyfit(self.Gv, self.data*(self.Gv - GvZapor), dim)
+		a = pc[0]
+		b = pc[1]
+		c = pc[2]
+		d = pc[3]
+		e = pc[4]
+		
+		x = self.GvX
+		y = (a*x**4 + b*x**3 + c*x**2 + d*x + e)/(x - GvZapor)
+
+		return y
+
+	elif dim == 5:
+		uc200 = 1.5			#при d=5 оптимально 1.5
+		uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
+		uc = np.polyfit([200,600],[uc200, uc600], 1)
+		GvZapor = (uc[0]*self.uLabel + uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
+
+		pc = np.polyfit(self.Gv, self.data*(self.Gv - GvZapor), dim)
+		a = pc[0]
+		b = pc[1]
+		c = pc[2]
+		d = pc[3]
+		e = pc[4]
+		f = pc[5]
+		
+		x = self.GvX
+		y = (a*x**5 + b*x**4 + c*x**3 + d*x**2 + e*x + f)/(x - GvZapor)
+
+		return y
 
 # функция, конвертирующая xls и xlsx в openpyxl
 def opener(file):
@@ -53,7 +109,7 @@ def opener(file):
 	return wb
 
 # setup function of a figure
-def setFigure():
+def setFigure_compressor_turbine():
 
 	#1 ================= structure of a figure =================
 	global fig, ax1, ax2, ax3, ax4, ax5, ax6
@@ -148,6 +204,86 @@ def setFigure():
 	ax6.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
 	ax6.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
 
+def setFigure_compressor_Tk():
+	#1 ================= structure of a figure =================
+	global fig, ax1, ax2, ax3, ax4, ax5
+	fig = plt.figure(f'Характеристики {file_1}' + f', {file_2}')
+	fig.subplots_adjust(left=0.04, bottom=0.06, right=0.99, top=0.97, wspace=0.09, hspace=0) # margins/paddings between subplots
+	ax1 = plt.subplot2grid((3, 2), (0, 0), rowspan=2)
+	ax2 = plt.subplot2grid((3, 2), (2, 0))
+	ax3 = plt.subplot2grid((3, 2), (0, 1))
+	ax4 = plt.subplot2grid((3, 2), (1, 1))
+	ax5 = plt.subplot2grid((3, 2), (2, 1))
+
+	#2 ===================== axes settings =====================
+
+	#2.1 -------------------------Pk---------------------
+	ax1.set_title('Характеристика компрессора')
+	ax1.xaxis.set_major_locator(MultipleLocator(0.1))
+	ax1.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax1.xaxis.set_minor_locator(MultipleLocator(0.02))
+	ax1.set_xticklabels([])
+
+	ax1.set_ylabel('Пк')
+	ax1.yaxis.set_major_locator(MultipleLocator(0.4))
+	ax1.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax1.yaxis.set_minor_locator(MultipleLocator(0.2))
+
+	#2.2 -------------------------KPDk--------------------
+	ax2.set_xlabel('Gв.пр')
+	ax2.xaxis.set_major_locator(MultipleLocator(0.1))
+	ax2.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax2.xaxis.set_minor_locator(MultipleLocator(0.02))
+
+	ax2.set_ylabel('КПД')
+	ax2.yaxis.set_major_locator(MultipleLocator(0.1))
+	ax2.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax2.yaxis.set_minor_locator(MultipleLocator(0.02))
+
+	#2.3 --------------------------Tk1-Gv---------------------
+	ax3.set_title('Характеристика турбины')
+	ax3.xaxis.set_major_locator(MultipleLocator(0.2))
+	ax3.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax3.xaxis.set_minor_locator(MultipleLocator(0.05))
+
+	ax3.set_ylabel('mft')
+	ax3.yaxis.set_major_locator(MultipleLocator(2))
+	ax3.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
+	ax3.yaxis.set_minor_locator(MultipleLocator(1))
+
+	#2.4 --------------------------Tk2-Gv---------------------
+	ax4.xaxis.set_major_locator(MultipleLocator(0.2))
+	ax4.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax4.xaxis.set_minor_locator(MultipleLocator(0.05))
+
+	ax4.set_ylabel(r'$\frac{U_{т1}}{С_0}$')
+	ax4.yaxis.set_major_locator(MultipleLocator(0.05))
+	ax4.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+	ax4.yaxis.set_minor_locator(MultipleLocator(0.01))
+
+	#2.5 ---------------------------ΔTk-Gv---------------------
+	ax5.xaxis.set_major_locator(MultipleLocator(0.2))
+	ax5.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax5.xaxis.set_minor_locator(MultipleLocator(0.05))
+
+	ax5.set_ylabel(r'$\ G_{г.пр.}$')
+	ax5.yaxis.set_major_locator(MultipleLocator(0.5))
+	ax5.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+	ax5.yaxis.set_minor_locator(MultipleLocator(0.1))
+
+	#3 ====================== grid settings =======================
+	ax1.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
+	ax1.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
+	ax2.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
+	ax2.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
+
+	ax3.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
+	ax3.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
+	ax4.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
+	ax4.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
+	ax5.grid(b=True, which='major', axis='both', color='#000000', linestyle='dotted', linewidth=1)
+	ax5.grid(b=True, which='minor', axis='both', color='#BDBDBD', linestyle='dotted', linewidth=1)
+
 class Plotter:
 	"""plotter grafics. Помпаж не передал ещё"""
 	def __init__(self, Gv, GvX, Pk, KPDk, Pt, PtX, mft, UCo, Gr, KPDt, marker, color):
@@ -171,11 +307,16 @@ class Plotter:
 		self.ax1plot = ax1.plot(self.Gv, self.Pk.data, self.marker, self.GvX, self.Pk.y, '-', c=self.color, markersize = markersize)
 		self.ax2plot = ax2.plot(self.Gv, self.KPDk.data, self.marker, self.GvX, self.KPDk.y, '-', c=self.color, markersize = markersize)
 
-		#3 plot turbine
-		self.ax3plot = ax3.plot(self.Pt, self.mft.data, self.marker, self.PtX, self.mft.y, '-', c=self.color, markersize = markersize)
-		self.ax4plot = ax4.plot(self.Pt, self.UCo.data, self.marker, self.PtX, self.UCo.y, '-', c=self.color, markersize = markersize)
-		self.ax5plot = ax5.plot(self.Pt, self.Gr.data, self.marker, self.PtX, self.Gr.y, '-', c=self.color, markersize = markersize)
-		self.ax6plot = ax6.plot(self.Pt, self.KPDt.data, self.marker, self.PtX, self.KPDt.y, '-', c=self.color, markersize = markersize)
+		if turbine == 0:	#3 plot Tk
+			self.ax3plot = ax3.plot(self.Pt, self.mft.data, self.marker, self.PtX, self.mft.y, '-', c=self.color, markersize = markersize)
+			self.ax4plot = ax4.plot(self.Pt, self.UCo.data, self.marker, self.PtX, self.UCo.y, '-', c=self.color, markersize = markersize)
+			self.ax5plot = ax5.plot(self.Pt, self.Gr.data, self.marker, self.PtX, self.Gr.y, '-', c=self.color, markersize = markersize)
+
+		else:					#4 plot turbine
+			self.ax3plot = ax3.plot(self.Pt, self.mft.data, self.marker, self.PtX, self.mft.y, '-', c=self.color, markersize = markersize)
+			self.ax4plot = ax4.plot(self.Pt, self.UCo.data, self.marker, self.PtX, self.UCo.y, '-', c=self.color, markersize = markersize)
+			self.ax5plot = ax5.plot(self.Pt, self.Gr.data, self.marker, self.PtX, self.Gr.y, '-', c=self.color, markersize = markersize)
+			self.ax6plot = ax6.plot(self.Pt, self.KPDt.data, self.marker, self.PtX, self.KPDt.y, '-', c=self.color, markersize = markersize)
 
 class Compressor:
 	'''Prototype of a compressor graf
@@ -190,26 +331,8 @@ class Compressor:
 		self.Gv = Gv
 		self.GvX = GvX
 
-		self.uc200 = 1.5			#при d=5 оптимально 1.5
-		self.uc600 = 1.001		#при d=5 оптимально 1.001-1,0001
-		self.uc = np.polyfit([200,600],[self.uc200, self.uc600], 1)
-		self.Gvmaxt = (self.uc[0]*uLabel + self.uc[1])*self.Gv[0] # теоретический максимум по расходу. это не очень точно, но хотя бы работает. В будущем надо обязательно попробовать градиентный спуск
 		self.data  = np.array([(row[column].value) for row in self.dataset if (type(row[column].value) == float and row[column].value != 0)])
-		
-		self.pc = np.polyfit(self.Gv, self.data*(self.Gv - self.Gvmaxt), 5)
-		self.a = self.pc[0]
-		self.b = self.pc[1]
-		self.c = self.pc[2]
-		self.d = self.pc[3]
-		self.e = self.pc[4]
-		self.f = self.pc[5]
-		
-		self.y = (self.a*self.GvX**3 + self.b*self.GvX**2 + self.c*self.GvX + self.d)/(self.GvX - self.Gvmaxt) #test with d=3 => underfitting
-		self.y = (self.a*self.GvX**4 + self.b*self.GvX**3 + self.c*self.GvX**2 + self.d*self.GvX + self.e)/(self.GvX - self.Gvmaxt)
-		self.y = (self.a*self.GvX**5 + self.b*self.GvX**4 + self.c*self.GvX**3 + self.d*self.GvX**2 + self.e*self.GvX + self.f)/(self.GvX - self.Gvmaxt)
-		
-	def aproximation5(self):
-		print(self.data)
+		self.y = aproximation(self, 5)
 
 class Turbine:
 	'''Prototype of a compressor graf
@@ -247,10 +370,14 @@ class Uk2:
 		self.color = color
 		self.firstRow = firstRow
 		self.lastRow = lastRow
-		self.data = self.ws[f'A{self.firstRow}':f'I{self.lastRow}']
+		self.data = self.ws[f'A{self.firstRow}':f'AR{self.lastRow}']
 
 		self.Gv = np.array([row[1].value for row in self.data if (type(row[1].value) == float and row[1].value != 0)]) #if not check => promlems with 0 and str values
 		self.GvX = np.linspace(self.Gv[0], self.Gv[-1], num=count, endpoint=True)
+
+		self.Tk1 = np.array([row[41].value for row in self.data if (type(row[1].value) == float and row[1].value != 0)])
+		self.Tk2 = np.array([row[42].value for row in self.data if (type(row[1].value) == float and row[1].value != 0)])
+		self.ΔTk = np.array([row[43].value for row in self.data if (type(row[1].value) == float and row[1].value != 0)])
 
 		self.Pt = np.array([(row[4].value) for row in self.data if (type(row[4].value) == float and row[4].value != 0)])
 		self.PtX = np.linspace(min(self.Pt), max(self.Pt), num=count, endpoint=True)
@@ -335,7 +462,7 @@ class Map:
 mapsList = []
 
 # =============================== 2) Config ===============================
-file_1 = 'ТКР_90-3_2020.05.21.xls'
+file_1 = 'gar0.xls'
 file_2 = 'ТКР 90-3-01-проверка.xls'
 file_3 = 'ТКР_80.15.13к05_2020.06.04.xlsx'
 file_4 = 'file4'
@@ -345,14 +472,18 @@ color_2 = 'red'	# color of map2
 color_3 = 'blue'	# color of map3
 color_4 = 'green'	# color of map4
 
+turbine = 0
 markersize = 4		# size of markers in graphs
 count = 100			# quantity of aproximation points
 
 # ============================ 3) Create the map ============================
-setFigure()
+if turbine == 0:
+	setFigure_compressor_Tk()
+else:
+	setFigure_compressor_turbine()
 
 map1 = Map(file_1, color_1)
-map2 = Map(file_2, color_2)
+# map2 = Map(file_2, color_2)
 # map3 = Map(file_3, color_3)
 # map4 = Map(file_4, color_4)
 
